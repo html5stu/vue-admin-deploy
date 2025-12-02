@@ -1,0 +1,4 @@
+/* src/assets/tailwind.css */
+@tailwind base; /* 基础样式（如默认字体、margin/padding 重置） */
+@tailwind components; /* 组件样式（可自定义复用组件） */
+@tailwind utilities; /* 工具类样式（核心！如 bg-blue-500、text-white） */
