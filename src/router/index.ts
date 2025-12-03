@@ -62,7 +62,7 @@ export const dynamicRoutes = []
 
 const router = createRouter({
   routes: [...constantRoutes],
-  history: createWebHistory(),
+  history: createWebHistory('/vue-admin-template/'),
 })
 
 export default router

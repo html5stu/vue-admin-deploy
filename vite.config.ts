@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     port: 3001,
   },
+  base: '/vue-admin-template/',
   resolve: {
     alias: {
       '@': '/src',
