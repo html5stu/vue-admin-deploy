@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { login, getUserInfo } from '@/api/auth'
+import router from '@/router' // <--- 1. 引入路由实例
 
 export const useUserStore = defineStore('user', {
   // 1. State: 定义数据状态
@@ -65,7 +66,7 @@ export const useUserStore = defineStore('user', {
       // --- 退出时重置为 false ---
       this.isInfoLoaded = false
       // 重定向到登录
-      window.location.href = '/login'
+      router.push('/login')
     },
   },
 })
