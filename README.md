@@ -1,3 +1,47 @@
-vue3 + elementPlus + ts + pinia + vue-router + axios + vite+tailwindcss搭建的后台系统模板
+# 项目介绍
 
-包括基本的用户管理 角色管理 权限管理 菜单管理 等
+这是一个前后端分离的后台管理系统，核心功能是用户信息的增删改查与权限管理。我独立完成了需求分析、技术选型、前后端开发、数据库设计、服务器部署的全流程，是一个能直接演示的全栈项目。
+
+1. 技术栈：前端 Vue3 + Element Plus + Axios | 后端 Express + MySQL | 部署 Nginx + PM2 + 阿里云服务器
+2. 核心亮点：JWT 鉴权、角色权限控制、SQL 防注入、分页筛选、生产环境部署
+3. [预览](https://ifxia.xyz/vue-admin-template/index)
+4. 测试账号 admin/admin123 user01/admin123
+
+代码仓库：
+前端：[前端git](https://gitee.com/chen_pengchao/amdin-tempalte)
+后端：[后端git](https://gitee.com/chen_pengchao/admin-node)
+
+# 功能清单
+
+模块 核心功能
+登录鉴权 1. 用户名密码校验 2. JWT Token 生成与验证 3. 路由守卫（未登录拦截）
+用户管理 1. 用户列表分页 / 筛选 2. 新增 / 编辑 / 删除用户 3. 角色权限分配（管理员 / 普通用户）
+角色管理 1. 角色列表分页 / 筛选 2. 新增 / 编辑 / 删除角色 3. 角色权限分配（菜单权限）
+菜单管理 1. 菜单列表分页 / 筛选 2. 新增 / 编辑 / 删除菜单 3. 菜单权限分配（角色权限）
+日志管理 1. 日志列表分页 / 筛选 2. 新增 / 编辑 / 删除日志 3. 日志权限分配（角色权限）
+通用功能 1. 全局加载状态 2. 统一错误提示 3. Excel 数据导出
+安全保障 1. 接口鉴权中间件 2. 参数化查询防 SQL 注入 3. 角色权限接口拦截
+
+快速上手
+本地开发环境搭建
+前端启动
+
+npm install
+
+# 启动开发服务
+
+npm run dev
+
+后端启动
+
+npm install
+
+# 配置数据库
+
+# 1. 修改 db/mysql.js 中的 MySQL 连接信息（用户名、密码、数据库名）
+
+# 2. 创建数据库并导入 sql 文件（项目根目录下的 init.sql）
+
+# 启动后端服务
+
+nodemon app.js
