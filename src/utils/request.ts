@@ -1,6 +1,55 @@
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/store/modules/user'
+let isErrorMessageShowing = false
+// 定义一个变量标记是否正在重新登录
+let isReloginShow = false
+
+function handle401() {
+  // 如果已经弹出了框，就不要再弹了
+  if (isReloginShow) return
+
+  isReloginShow = true // 加锁
+
+  ElMessageBox.confirm(
+    '登录状态已过期，您可以继续留在该页面，或者重新登录',
+    '系统提示',
+    {
+      confirmButtonText: '重新登录',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  )
+    .then(() => {
+      // 点击确定
+      isReloginShow = false // 解锁
+      const userStore = useUserStore()
+      userStore.logout() // 登出并跳转
+    })
+    .catch(() => {
+      // 点击取消
+      isReloginShow = false // 解锁
+    })
+}
+/**
+ * 统一错误提示函数（节流版）
+ * 规则：3秒内只弹出一个错误提示，防止并发请求失败瞬间刷屏
+ */
+const showError = (msg) => {
+  if (isErrorMessageShowing) {
+    return // 如果锁住了，直接返回，不再弹窗
+  }
+  isErrorMessageShowing = true // 上锁
+  ElMessage.error({
+    message: msg,
+    duration: 3000, // 提示停留时间
+  })
+
+  // 3秒后解锁
+  setTimeout(() => {
+    isErrorMessageShowing = false
+  }, 3000)
+}
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
@@ -25,37 +74,34 @@ request.interceptors.response.use(
     // 对响应数据做点什么
     console.log('response', response)
     if (response.data.code != 200) {
-      ElMessage.error(response.data.message)
+      showError(response.data.message)
       return Promise.reject(response.data.message)
     }
     return Promise.resolve(response.data)
   },
   (error) => {
-    console.log('error', error)
-    const status = error.response.status
-    console.log('status', status)
+    let message = ''
+    // 增加判空处理，防止断网时 error.response 为 undefined 导致代码报错
+    const status = error.response ? error.response.status : 0
     if (status === 401) {
-      // 未登录或token过期
-      ElMessage.error(error.response.data.message || '请先登录')
-      // 可以在这里跳转到登录页面
-      const userStore = useUserStore()
-      userStore.logout() // 触发退出逻辑（清缓存+跳
+      handle401()
+      return Promise.reject(error)
     } else if (status === 403) {
       // 没有权限
-      ElMessage.error(error.response.data.message || '没有权限访问')
+      message = error.response.data.message || '没有权限访问'
     } else if (status === 404) {
       // 请求的资源不存在
-      ElMessage.error('请求的资源不存在')
-      return Promise.reject(error)
+      message = '请求的资源不存在'
     } else if (status >= 500) {
       // 服务器错误
-      ElMessage.error(error.response.data.message || '服务器错误，请稍后再试')
-      return Promise.reject(error)
+      message = error.response.data.message || '服务器错误，请稍后再试'
     } else {
       // 其他错误
-      ElMessage.error(error.response.data.message || '请求失败，请稍后再试')
-      return Promise.reject(error)
+      message = error.message || '请求失败，请检查网络'
     }
+    showError(message)
+
+    return Promise.reject(error)
   }
 )
 
