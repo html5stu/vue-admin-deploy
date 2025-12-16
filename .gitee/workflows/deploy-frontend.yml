@@ -1,63 +1,74 @@
-name: 前端自动+手动部署
+name: 前端自动化部署
 on:
   push:
     branches: [master]
   workflow_dispatch:
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # 覆盖容器配置（解决Node版本问题）
-    container:
-      image: ubuntu:22.04 # 用纯净Ubuntu镜像，手动装Node
     steps:
-      - name: 拉取代码
+      # 1. 拉取代码
+      - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 关键：手动安装Node.js 18（替换容器旧版本）
-      - name: 安装Node.js 18.x
+      # 2. 核心修复：使用官方插件安装 Node.js 18
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      # 3. 验证环境并打包
+      - name: Install & Build
         run: |
-          # 更新系统依赖
-          apt update && apt install -y curl wget
-          # 安装NodeSource源（稳定版18）
-          curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-          # 安装Node.js和npm
-          apt install -y nodejs
-          # 验证版本（必须≥18）
+          echo "当前 Node 版本:"
           node -v
+          echo "当前 NPM 版本:"
           npm -v
 
-      - name: 安装依赖并打包
-        run: |
-          # 国内源加速
+          # 设置淘宝源加速
           npm config set registry https://registry.npmmirror.com
-          # 清理缓存
-          npm cache clean --force
-          # 安装依赖
-          npm install --force
-          # 先删除旧dist（避免缓存）
-          rm -rf ./dist
-          # 执行打包（输出详细日志）
-          npm run build --verbose
-          # 验证dist是否生成
-          if [ ! -d "./dist" ]; then
-            echo "❌ dist文件夹未生成！"
-            exit 1
-          fi
-          ls -la ./dist/
 
-      - name: 部署到阿里云服务器
-        uses: appleboy/ssh-action@master
-        if: success() && exists('./dist')
+          # 安装依赖
+          npm install
+
+          # 打包
+          npm run build
+
+          # 验证产物
+          ls -la dist/
+
+      # 4. 修复：传输文件 (使用 scp-action)
+      - name: Copy files to Server
+        uses: appleboy/scp-action@master
         with:
           host: ${{ env.SERVER_IP }}
           username: ${{ env.SERVER_USER }}
           key: ${{ env.SERVER_SSH_KEY }}
-          scp: |
-            ./dist/* ${{ env.SERVER_USER }}@${{ env.SERVER_IP }}:/var/www/html/vue-admin-template/
+          # 将本地 dist 目录下的所有文件，复制到服务器指定目录
+          # strip_components: 1 表示去掉 dist 这一层文件夹，直接把内容拷进去
+          source: 'dist/*'
+          target: '/var/www/html/vue-admin-template/'
+          strip_components: 1
+
+      # 5. 修复：远程执行命令 (使用 ssh-action)
+      - name: Restart Nginx
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ env.SERVER_IP }}
+          username: ${{ env.SERVER_USER }}
+          key: ${{ env.SERVER_SSH_KEY }}
           script: |
+            echo "文件传输完成，检查目录..."
+            ls -la /var/www/html/vue-admin-template/
+
+            # 设置权限
             sudo chown -R www-data:www-data /var/www/html/vue-admin-template/
             sudo chmod -R 755 /var/www/html/vue-admin-template/
-            sudo systemctl restart nginx
-            ls -la /var/www/html/vue-admin-template/
+
+            # 重启 Nginx (如果只是静态文件更新，其实不需要重启nginx，但重启也没事)
+            # 建议使用 reload 而不是 restart，避免服务中断
+            sudo systemctl reload nginx
+            echo "🚀 部署成功!"
