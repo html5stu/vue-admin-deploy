@@ -1,76 +1,22 @@
-name: 前端强力部署
+name: 极速部署(本地已打包)
 on:
   push:
     branches: [master]
-  workflow_dispatch:
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: 拉取代码
+      - name: 拉取代码 (包含dist)
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      # ----------------------------------------------------------------
-      # 核心修改：不再依赖环境变量，直接替换系统底层二进制文件
-      # ----------------------------------------------------------------
-      - name: 暴力替换 Node.js 为 v18
+      - name: 检查 dist
         run: |
-          echo ">>> 原始版本："
-          node -v
-
-          # 1. 使用淘宝源安装 n (Node版本管理器)
-          npm config set registry https://registry.npmmirror.com
-          sudo npm install -g n
-
-          # 2. 下载并安装 Node 18
-          sudo n 18
-
-          # 3. 【关键步骤】查找新版 Node 安装位置
-          # n 通常安装在 /usr/local/bin/node
-          NEW_NODE_PATH=$(which node)
-          echo ">>> 新版 Node 路径: $NEW_NODE_PATH"
-
-          # 4. 【暴力美学】强制覆盖系统默认的 /usr/bin/node
-          # 很多 CI 环境默认锁死 /usr/bin/node，我们直接把它删了换成新的
-          if [ -f "/usr/bin/node" ]; then
-            sudo rm /usr/bin/node
-          fi
-          sudo ln -s /usr/local/bin/node /usr/bin/node
-
-          if [ -f "/usr/bin/npm" ]; then
-            sudo rm /usr/bin/npm
-          fi
-          sudo ln -s /usr/local/bin/npm /usr/bin/npm
-
-          # 5. 再次验证
-          echo ">>> 替换后版本 (必须是 v18)："
-          /usr/bin/node -v
-          node -v
-          npm -v
-
-      - name: 安装依赖 & 打包
-        run: |
-          echo ">>> 开始打包..."
-          # 确保使用淘宝源
-          npm config set registry https://registry.npmmirror.com
-
-          # 忽略依赖冲突强制安装
-          npm install --force
-
-          # 执行打包
-          npm run build
-
-          # 验证产物
           if [ ! -d "./dist" ]; then
-            echo "❌ 错误：dist 目录未生成，打包失败！"
+            echo "❌ 仓库里没有 dist 文件夹！请在本地打包并提交 dist。"
             exit 1
           fi
-          ls -la dist/
 
-      - name: 上传文件到服务器
+      - name: 直接上传
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_IP }}
@@ -80,14 +26,10 @@ jobs:
           target: '/var/www/html/vue-admin-template/'
           strip_components: 1
 
-      - name: 部署重载
+      - name: 重启 Nginx
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            sudo chown -R www-data:www-data /var/www/html/vue-admin-template/
-            sudo chmod -R 755 /var/www/html/vue-admin-template/
-            sudo systemctl reload nginx
-            echo "✅ 部署完成"
+          script: 'sudo systemctl reload nginx'
