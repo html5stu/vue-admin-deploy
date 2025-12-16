@@ -22,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22.13.0' # <--- 关键修改：设置 Node.js 版本
           cache: 'pnpm' # <--- 关键修改：告诉它去找 pnpm-lock.yaml
 
       # 3. 修改：使用 pnpm 命令安装和打包
