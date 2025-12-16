@@ -1,0 +1,44 @@
+# 流水线名称
+name: 前端自动+手动部署
+
+# 触发规则
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# 构建任务
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 步骤1：拉取前端代码
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      # 步骤2：云端安装 Node.js 并打包（避免服务器环境差异）
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18 # 匹配前端项目 Node 版本
+
+      - name: 安装依赖并打包
+        run: |
+          npm install --registry=https://registry.npmmirror.com  # 国内源加速
+          npm run build  # 生成 dist 文件夹
+
+      # 步骤3：SSH 上传 dist 到服务器并重启 Nginx
+      - name: 部署到阿里云服务器
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ env.SERVER_IP }}
+          username: ${{ env.SERVER_USER }}
+          key: ${{ env.SERVER_SSH_KEY }}
+          # 先上传文件，再执行脚本
+          scp: |
+            ./dist/* ${{ env.SERVER_USER }}@${{ env.SERVER_IP }}:/var/www/html/vue-admin-template/
+          script: |
+            # 重启 Nginx 使前端代码生效
+            sudo systemctl restart nginx
+            # 验证 Nginx 状态
+            sudo systemctl status nginx --no-pager
