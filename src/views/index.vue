@@ -1,5 +1,5 @@
 <template>
-  <div>首页11221</div>
+  <div>啊实打实</div>
 </template>
 
 <script setup lang="ts">
