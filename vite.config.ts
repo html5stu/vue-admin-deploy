@@ -5,6 +5,12 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     port: 3001,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000', // 本地后端地址
+        changeOrigin: true,
+      },
+    },
   },
   base: '/vue-admin-template/',
   resolve: {

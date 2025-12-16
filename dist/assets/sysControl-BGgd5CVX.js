@@ -1,1 +1,0 @@
-import{_ as o,a as n,o as r,b as s}from"./index-B9wvQeQm.js";const t={};function a(c,e){return r(),n("div",null,[...e[0]||(e[0]=[s("h1",null,"系统控制",-1)])])}const _=o(t,[["render",a]]);export{_ as default};
