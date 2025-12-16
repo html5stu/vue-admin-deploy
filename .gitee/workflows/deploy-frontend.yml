@@ -12,33 +12,63 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      # 步骤1：拉取前端代码
+      # 步骤1：拉取前端源码（确保完整拉取）
       - name: 拉取代码
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 拉取完整提交记录，避免依赖缺失
 
-      # 步骤2：云端安装 Node.js 并打包（避免服务器环境差异）
+      # 步骤2：配置 Node.js 环境（缓存依赖加速构建）
       - name: 安装 Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18 # 匹配前端项目 Node 版本
+          node-version: 18 # 匹配本地打包成功的 Node 版本
+          cache: 'npm' # 缓存 node_modules，避免重复安装
 
+      # 步骤3：安装依赖并打包（增加调试+容错）
       - name: 安装依赖并打包
         run: |
-          npm install --registry=https://registry.npmmirror.com  # 国内源加速
-          npm run build  # 生成 dist 文件夹
+          # 打印环境信息，便于排查版本问题
+          echo "Node 版本：$(node -v)"
+          echo "NPM 版本：$(npm -v)"
+          # 清理旧依赖缓存
+          npm cache clean --force
+          # 安装依赖（国内源+强制安装，忽略警告）
+          npm install --registry=https://registry.npmmirror.com --force
+          # 执行打包（输出详细日志，定位打包失败原因）
+          npm run build --verbose
+          # 关键：验证 dist 文件夹是否生成，并打印内容
+          if [ -d "./dist" ]; then
+            echo "✅ dist 文件夹生成成功，内容如下："
+            ls -la ./dist/
+          else
+            echo "❌ dist 文件夹未生成，打包失败！"
+            exit 1  # 终止流程，避免无效上传
+          fi
 
-      # 步骤3：SSH 上传 dist 到服务器并重启 Nginx
+      # 步骤4：SSH 上传 dist 内的所有文件到服务器目标目录
       - name: 部署到阿里云服务器
         uses: appleboy/ssh-action@master
+        # 仅当 dist 存在且打包成功时执行
+        if: success() && exists('./dist')
         with:
           host: ${{ env.SERVER_IP }}
           username: ${{ env.SERVER_USER }}
           key: ${{ env.SERVER_SSH_KEY }}
-          # 先上传文件，再执行脚本
+          # 上传 dist 内的所有文件（包括子目录）到目标目录
+          # 注意：./dist/* 表示上传 dist 里的内容，而非 dist 文件夹本身
           scp: |
             ./dist/* ${{ env.SERVER_USER }}@${{ env.SERVER_IP }}:/var/www/html/vue-admin-template/
+          # 服务器端后续操作：权限修复 + 重启 Nginx
           script: |
-            # 重启 Nginx 使前端代码生效
+            echo "✅ 开始部署前端文件到 /var/www/html/vue-admin-template/"
+            # 修复目录权限（Nginx 访问必需）
+            sudo chown -R www-data:www-data /var/www/html/vue-admin-template/
+            sudo chmod -R 755 /var/www/html/vue-admin-template/
+            # 重启 Nginx 生效
             sudo systemctl restart nginx
-            # 验证 Nginx 状态
+            # 验证部署结果
+            echo "✅ Nginx 状态："
             sudo systemctl status nginx --no-pager
+            echo "✅ 服务器目标目录内容："
+            ls -la /var/www/html/vue-admin-template/
