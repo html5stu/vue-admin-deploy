@@ -1,4 +1,4 @@
-name: 前端自动化部署
+name: Gitee前端部署
 on:
   push:
     branches: [master]
@@ -9,26 +9,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # 1. 拉取代码
-      - name: Checkout Code
+      - name: 拉取代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. 核心修复：使用官方插件安装 Node.js 18
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-
-      # 3. 验证环境并打包
-      - name: Install & Build
+      # 2. 核心修复：使用 npm + 淘宝源 暴力升级 Node
+      - name: 暴力升级 Node.js 到 18
         run: |
-          echo "当前 Node 版本:"
+          echo "升级前 Node 版本："
           node -v
-          echo "当前 NPM 版本:"
+
+          # 1. 设置淘宝镜像源 (关键！)
+          npm config set registry https://registry.npmmirror.com
+
+          # 2. 全局安装 n (Node版本管理工具)
+          sudo npm install -g n
+
+          # 3. 强制安装并切换到 Node 18
+          sudo n 18
+
+          # 4. 刷新环境变量 (确保当前 shell 能找到新 node)
+          hash -r 
+
+          echo "升级后 Node 版本 (必须 >= 18)："
+          node -v
           npm -v
 
-          # 设置淘宝源加速
+      # 3. 安装依赖并打包
+      - name: 安装依赖 & 打包
+        run: |
+          # 再次确保是用淘宝源
           npm config set registry https://registry.npmmirror.com
 
           # 安装依赖
@@ -37,38 +48,31 @@ jobs:
           # 打包
           npm run build
 
-          # 验证产物
+          # 检查产物
           ls -la dist/
 
-      # 4. 修复：传输文件 (使用 scp-action)
-      - name: Copy files to Server
+      # 4. 上传文件 (SCP)
+      - name: 上传 dist 到服务器
         uses: appleboy/scp-action@master
         with:
           host: ${{ env.SERVER_IP }}
           username: ${{ env.SERVER_USER }}
           key: ${{ env.SERVER_SSH_KEY }}
-          # 将本地 dist 目录下的所有文件，复制到服务器指定目录
-          # strip_components: 1 表示去掉 dist 这一层文件夹，直接把内容拷进去
           source: 'dist/*'
           target: '/var/www/html/vue-admin-template/'
           strip_components: 1
 
-      # 5. 修复：远程执行命令 (使用 ssh-action)
-      - name: Restart Nginx
+      # 5. 重启 Nginx (SSH)
+      - name: 修正权限并重启 Nginx
         uses: appleboy/ssh-action@master
         with:
           host: ${{ env.SERVER_IP }}
           username: ${{ env.SERVER_USER }}
           key: ${{ env.SERVER_SSH_KEY }}
           script: |
-            echo "文件传输完成，检查目录..."
-            ls -la /var/www/html/vue-admin-template/
-
-            # 设置权限
+            # 赋予 www-data 权限
             sudo chown -R www-data:www-data /var/www/html/vue-admin-template/
             sudo chmod -R 755 /var/www/html/vue-admin-template/
-
-            # 重启 Nginx (如果只是静态文件更新，其实不需要重启nginx，但重启也没事)
-            # 建议使用 reload 而不是 restart，避免服务中断
+            # 重载配置
             sudo systemctl reload nginx
-            echo "🚀 部署成功!"
+            echo "部署完成！"
