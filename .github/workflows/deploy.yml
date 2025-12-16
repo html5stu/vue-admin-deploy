@@ -1,34 +1,40 @@
-name: Deploy to Aliyun
+name: Deploy to Aliyun (PNPM)
 on:
   push:
     branches:
-      - master # 或者 main，根据你的分支名修改
+      - master
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest # GitHub 的环境非常标准
+    runs-on: ubuntu-latest
 
     steps:
-      # 1. 拉取代码
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. 关键：设置 Node.js 18 (GitHub 官方插件，秒级安装，绝对成功)
+      # 1. 核心新增：安装 PNPM
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9 # 这里建议写你本地使用的 pnpm 大版本 (如 8 或 9)
+
+      # 2. 修改：设置 Node 并开启 pnpm 缓存
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm' # 自动缓存依赖，下次构建更快
+          cache: 'pnpm' # <--- 关键修改：告诉它去找 pnpm-lock.yaml
 
-      # 3. 安装依赖并打包
+      # 3. 修改：使用 pnpm 命令安装和打包
       - name: Install & Build
         run: |
-          node -v  # 这里打印出来绝对是 v18.x.x
-          npm install
-          npm run build
-          ls -la dist/ # 确认打包成功
+          node -v
+          pnpm -v
+          pnpm install --frozen-lockfile # 类似 npm ci，严格按照 lock 文件安装
+          pnpm run build
+          ls -la dist/
 
-      # 4. 上传文件到阿里云
+      # 4. 上传文件 (保持不变)
       - name: Deploy to Server
         uses: appleboy/scp-action@master
         with:
@@ -37,9 +43,9 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: 'dist/*'
           target: '/var/www/html/vue-admin-template/'
-          strip_components: 1 # 去掉 dist 这一层目录
+          strip_components: 1
 
-      # 5. 重启 Nginx (可选，静态文件通常不需要重启，但为了保险)
+      # 5. 重启 Nginx (保持不变)
       - name: Restart Nginx
         uses: appleboy/ssh-action@master
         with:
@@ -49,5 +55,4 @@ jobs:
           script: |
             sudo chown -R www-data:www-data /var/www/html/vue-admin-template/
             sudo chmod -R 755 /var/www/html/vue-admin-template/
-            # sudo systemctl reload nginx 
             echo "部署完成！"
